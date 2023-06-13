@@ -1,0 +1,5 @@
+.DS_Store
+.vscode
+embed/build
+embed/dependencies.lock
+embed/sdkconfig*
