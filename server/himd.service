@@ -1,0 +1,11 @@
+[Unit]
+Description=himmnmnmnnnmnn
+Documentation=https://github.com/jaytlang/him
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/himd
+
+[Install]
+WantedBy=default.target
+
