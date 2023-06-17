@@ -4,18 +4,18 @@
  * (c) jay lang, 2023
  * redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * 1. redistributions of source code must retain the above copyright notice,
  * this list of conditions and the following disclaimer.
- * 
+ *
  * 2. redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
+ *
  * 3. neither the name of the copyright holder nor the names of its
  * contributors may be used to endorse or promote products derived from this
  * software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS”
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -41,47 +41,69 @@
 
 LOG_SET_TAG("main");
 
+static void	 wifi_state_changed(int);
+static char	*ssid, *pass;
+
+static void
+wifi_state_changed(int connected)
+{
+	if (!connected) {
+		ESP_LOGW(TAG, "lost wifi connectivity");
+		fs_clear_credentials();
+		reboot(NULL);
+	}
+
+	ESP_LOGI(TAG, "wifi up, starting late boot activities");
+	led_spin(LED_COLOR_PURPLE);
+}
+
 void
 die(void)
 {
-	fs_clear_credentials();
-	httpd_teardown();
-	rmt_teardown();
-
 	ESP_LOGW(TAG, "unrecoverable error detected; rebooting");
-	sleep(5);
+
+	/* have to call this so that further button presses don't
+	 * trigger interrupts and mess us up any more
+	 */
+	button_teardown();
+
+	led_blink(LED_COLOR_RED);
+	sleep(6);
+
+	fs_clear_credentials();
 	esp_restart();
 }
 
 int
-reboot(void)
+reboot(void *arg)
 {
-	ESP_LOGI(TAG, "preparing for reboot");
-	httpd_teardown();
+	ESP_LOGW(TAG, "preparing for reboot");
+
+	if (ssid == NULL) httpd_teardown();
+	led_teardown();
 	rmt_teardown();
 	esp_restart();
+	button_teardown();
 
 	/* never reached */
 	return SCHED_STOP;
+	(void)arg;
 }
 
 void
 app_main(void)
 {
-	char		*ssid, *pass;
-
-	/* early boot */
+	/* mission critical */
 	ESP_LOGI(TAG, "hello, world!");
 	esp_log_level_set("*", LOG_LEVEL);
+	esp_event_loop_create_default();
 
-	CATCH_GOTO(esp_event_loop_create_default(), error);
+	/* early boot */
+	CATCH_GOTO(button_init(), error);
 	CATCH_GOTO(rmt_init(), error);
 	CATCH_GOTO(led_init(), error);
 
 	CATCH_GOTO(led_blink(LED_COLOR_PURPLE), error);
-	/* the LED blink interval is 1 second - get on and off */
-	sleep(2);
-	CATCH_GOTO(led_solid(0), error);
 
 	/* late boot */
 
@@ -90,16 +112,15 @@ app_main(void)
 
 	if (ssid == NULL) {
 		ESP_LOGI(TAG, "no credentials found, bootstrapping");
-		CATCH_GOTO(led_blink(LED_COLOR_RED), error);
+		CATCH_GOTO(led_blink(LED_COLOR_YELLOW), error);
 
 		CATCH_GOTO(wifi_initap(), error);
 		CATCH_GOTO(mdns_advertise(), error);
 		CATCH_GOTO(httpd_init(), error);
 
 	} else {
-		ESP_LOGI(TAG, "got credentials, connecting");
-		CATCH_GOTO(led_blink(LED_COLOR_TURQUOISE), error);
-		CATCH_GOTO(wifi_initsta(ssid, pass), error);
+		ESP_LOGI(TAG, "got credentials, connecting (cb = %p)", &wifi_state_changed);
+		CATCH_GOTO(wifi_initsta(ssid, pass, &wifi_state_changed), error);
 	}
 
 	return;

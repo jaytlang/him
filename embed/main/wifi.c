@@ -5,18 +5,18 @@
  * (c) jay lang, 2023
  * redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * 1. redistributions of source code must retain the above copyright notice,
  * this list of conditions and the following disclaimer.
- * 
+ *
  * 2. redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
+ *
  * 3. neither the name of the copyright holder nor the names of its
  * contributors may be used to endorse or promote products derived from this
  * software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS”
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -43,13 +43,14 @@
 LOG_SET_TAG("wifi");
 
 static esp_netif_t	*netif;
-static int		 retries = 0;
 
 static esp_err_t	 netif_init_ap(void);
 static esp_err_t	 netif_init_sta(void);
 
 static void		 wifi_event_handler(void *, esp_event_base_t,
 			    int32_t, void *);
+
+static void		(*cb)(int);
 
 static esp_err_t
 netif_init_ap(void)
@@ -91,18 +92,15 @@ wifi_event_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
 			ESP_LOGI(TAG, "wifi up, attempting to connect to AP");
 			esp_wifi_connect();
 		} else if (id == WIFI_EVENT_STA_DISCONNECTED) {
-			if (++retries < WIFI_RETRIES) {
-				ESP_LOGI(TAG, "retrying connect to AP (%d/%d)",
-				    retries, WIFI_RETRIES);
-				esp_wifi_connect();
-			} else {
-				ESP_LOGW(TAG, "unable to connect to AP");
-				die();
-			}
+			ESP_LOGW(TAG, "unable to connect to AP");
+			cb(0);
 		}
 	} else if (base == IP_EVENT) {
-		if (id == IP_EVENT_STA_GOT_IP)
+		if (id == IP_EVENT_STA_GOT_IP) {
 			ESP_LOGI(TAG, "negotiated IP from AP, all good");
+			ESP_LOGI(TAG, "calling %p", cb);
+			cb(1);
+		}
 	}
 }
 
@@ -130,7 +128,7 @@ wifi_initap(void)
 }
 
 esp_err_t
-wifi_initsta(char *ssid, char *pass)
+wifi_initsta(char *ssid, char *pass, void (*ncb)(int))
 {
 	wifi_init_config_t		initcfg = WIFI_INIT_CONFIG_DEFAULT();
 	wifi_config_t			cfg;
@@ -154,6 +152,8 @@ wifi_initsta(char *ssid, char *pass)
 
 	CATCH_RETURN(esp_wifi_set_config(WIFI_IF_STA, &cfg));
 
+	cb = ncb;
+
 	CATCH_RETURN(esp_event_handler_register(WIFI_EVENT,
 	    WIFI_EVENT_STA_START,
 	    &wifi_event_handler,
@@ -173,6 +173,6 @@ wifi_initsta(char *ssid, char *pass)
 		ESP_LOGI(TAG, "initialized STA with open SSID %s", ssid);
 	else ESP_LOGI(TAG, "intialized STA with SSID %s, WPA2-PSK password %s",
 	    ssid, pass);
-	
+
 	return 0;
 }

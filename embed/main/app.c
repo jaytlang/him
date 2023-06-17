@@ -1,6 +1,5 @@
-/* sched.c
- * fire custom callbacks at deferred times - a
- * thin wrapper around the esp event library
+/* app.c
+ * main application logic
  *
  * (c) jay lang, 2023
  * redistribution and use in source and binary forms, with or without
@@ -29,69 +28,3 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-
-#include <stdint.h>
-#include <errno.h>
-#include <stdlib.h>
-
-#include "esp_log.h"
-#include "esp_timer.h"
-
-#include "him.h"
-
-LOG_SET_TAG("sched");
-
-struct cbargs {
-	int			(*cb)(void *);
-	void			 *arg;
-	esp_timer_handle_t	  timer;
-};
-
-static void	sched_callback(void *);
-
-void
-sched_callback(void *arg)
-{
-	struct cbargs	*cba = (struct cbargs *)arg;
-	if (cba->cb(cba->arg) == SCHED_STOP) {
-		esp_timer_stop(cba->timer);
-		esp_timer_delete(cba->timer);
-		free(cba);
-	}
-}
-
-esp_err_t
-sched_schedule(uint64_t period, int (*cb)(void *), void *arg)
-{
-	struct cbargs		*cba;
-	esp_timer_create_args_t	 cfg;
-	esp_err_t		 err;
-
-	cba = malloc(sizeof(struct cbargs));
-	if (cba == NULL) CATCH_RETURN(errno);
-
-	cba->cb = cb;
-	cba->arg = arg;
-
-	cfg.callback = sched_callback;
-	cfg.arg = cba;
-	cfg.dispatch_method = ESP_TIMER_TASK;
-	cfg.name = "sched timer";
-	cfg.skip_unhandled_events = 0;
-
-	err = esp_timer_create(&cfg, &cba->timer);
-
-	if (err != ESP_OK) {
-		free(cba);
-		CATCH_RETURN(err);
-	}
-
-	err = esp_timer_start_periodic(cba->timer, period);
-	if (err != ESP_OK) {
-		esp_timer_delete(cba->timer);
-		free(cba);
-		CATCH_RETURN(err);
-	}
-
-	return 0;
-}

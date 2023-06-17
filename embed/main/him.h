@@ -5,18 +5,18 @@
  * (c) jay lang, 2023
  * redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * 1. redistributions of source code must retain the above copyright notice,
  * this list of conditions and the following disclaimer.
- * 
+ *
  * 2. redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
+ *
  * 3. neither the name of the copyright holder nor the names of its
  * contributors may be used to endorse or promote products derived from this
  * software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS”
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -33,6 +33,7 @@
 #ifndef HIM_H
 #define HIM_H
 
+#include "esp_event.h"
 #include "esp_check.h"
 
 /* esp error checking */
@@ -76,7 +77,7 @@
 
 /* main.c */
 void			die(void);
-int			reboot(void);
+int			reboot(void *);
 
 /* fs.c */
 #define FS_ROOT		"/spiffs"
@@ -99,7 +100,7 @@ void			fs_clear_credentials(void);
 #define WIFI_RETRIES	5
 
 esp_err_t		wifi_initap(void);
-esp_err_t		wifi_initsta(char *, char *);
+esp_err_t		wifi_initsta(char *, char *, void (*)(int));
 
 /* mdns.c */
 #define MDNS_HOSTNAME	"him"
@@ -128,7 +129,7 @@ void			httpd_teardown(void);
 #define SCHED_MS_PER_S	1000
 #define SCHED_US_PER_S	(SCHED_US_PER_MS * SCHED_MS_PER_S)
 
-esp_err_t		sched_schedule(uint64_t, int (*)(void));
+esp_err_t		sched_schedule(uint64_t, int (*)(void *), void *);
 
 /* rmt.c */
 #define RMT_GPIO_NUM		4
@@ -172,6 +173,17 @@ void			led_teardown(void);
  */
 esp_err_t		led_solid(uint8_t);
 esp_err_t		led_blink(uint8_t);
-// void			led_spinny(struct pixel);
+esp_err_t		led_spin(uint8_t);
+
+/* button.c */
+#define BUTTON_GPIO_NUM		5
+#define BUTTON_EVENT_CHANGED	1
+
+#define BUTTON_RESET_DELAY_US	(3 * SCHED_US_PER_S)
+
+ESP_EVENT_DECLARE_BASE(BUTTON_EVENT);
+
+esp_err_t		button_init(void);
+void			button_teardown(void);
 
 #endif /* HIM_H */

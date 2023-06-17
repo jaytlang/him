@@ -4,18 +4,18 @@
  * (c) jay lang, 2023
  * redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * 1. redistributions of source code must retain the above copyright notice,
  * this list of conditions and the following disclaimer.
- * 
+ *
  * 2. redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
+ *
  * 3. neither the name of the copyright holder nor the names of its
  * contributors may be used to endorse or promote products derived from this
  * software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS”
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -30,6 +30,7 @@
  */
 
 #include <stdint.h>
+#include <unistd.h>
 
 #include "driver/rmt_encoder.h"
 #include "driver/rmt_tx.h"
@@ -54,7 +55,7 @@
 #define MEM_SYMBOLS		(SYMBOL_BYTES * RMT_BITS_PER_LED * RMT_NUM_LEDS)
 
 /* totally arbitrary pick here */
-#define TXQ_BACKLOG_SIZE	4
+#define TXQ_BACKLOG_SIZE	16
 
 /* WS2812 protocol - each bit is a pair of levels
  * The duration of each level sums to 1200ns, and
@@ -69,7 +70,7 @@
 #define ONE_LEVEL_FIRST_NS	900
 #define ONE_LEVEL_SECOND_NS	300
 
-#define NS_TO_TICKS(NS)		((NS) / TICK_PERIOD_NS)	
+#define NS_TO_TICKS(NS)		((NS) / TICK_PERIOD_NS)
 
 LOG_SET_TAG("rmt");
 
@@ -92,7 +93,7 @@ rmt_encode(rmt_encoder_t *enc, rmt_channel_handle_t ch,
 	 * call encode() and get a result which is one or more of
 	 * - complete
 	 * - would block (i.e. "memory full")
-	 * 
+	 *
 	 * in addition, there's also this RESET flag, which
 	 * indicates that the encoder is 'reset' and ready for
 	 * another transmission. in reality, however, this is
@@ -206,6 +207,9 @@ rmt_enqueue(void *data, size_t datasize)
 void
 rmt_teardown(void)
 {
+	rmt_del_encoder(&base);
+
+	rmt_disable(chan);
 	rmt_del_channel(chan);
 	chan = NULL;
-}                                                     
+}

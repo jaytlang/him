@@ -4,18 +4,18 @@
  * (c) jay lang, 2023
  * redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * 1. redistributions of source code must retain the above copyright notice,
  * this list of conditions and the following disclaimer.
- * 
+ *
  * 2. redistributions in binary form must reproduce the above copyright
  * notice, this list of conditions and the following disclaimer in the
  * documentation and/or other materials provided with the distribution.
- * 
+ *
  * 3. neither the name of the copyright holder nor the names of its
  * contributors may be used to endorse or promote products derived from this
  * software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS”
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -99,7 +99,7 @@ query_string_lookup(char *str, char *key)
 		char a, b;
 
 		if (encbuf[j] == '%' &&
-		    (a = encbuf[j + 1]) &&	
+		    (a = encbuf[j + 1]) &&
 		    (b = encbuf[j + 2]) &&
 		    isxdigit(a) && isxdigit(b)) {
 
@@ -153,7 +153,7 @@ handle_file(httpd_req_t *req)
 		if (*suffix == '?') {
 			*suffix = '\0';
 			break;
-		}		
+		}
 	}
 
 	fnamesize = strlen(req->uri) + strlen(HTTPD_ROOT) + 1;
@@ -197,7 +197,7 @@ handle_cred_update(httpd_req_t *req)
 	free(buf);
 
 	ESP_LOGI(TAG, "credential update complete, scheduling reboot in 10s");
-	sched_schedule(10 * SCHED_US_PER_S, reboot);	
+	sched_schedule(10 * SCHED_US_PER_S, reboot, NULL);
 	return handle_file(req);
 }
 
@@ -248,7 +248,7 @@ httpd_init(void)
 	uris[numuris].method = HTTP_GET;
 	uris[numuris].handler = &handle_cred_update;
 	uris[numuris].user_ctx = NULL;
-	
+
 	rv = httpd_register_uri_handler(server, &uris[numuris++]);
 	if (rv == ESP_OK)
 		ESP_LOGI(TAG, "registered special handler " HTTPD_CONFIRM);
@@ -257,7 +257,7 @@ httpd_init(void)
 	uris[numuris].method = HTTP_GET;
 	uris[numuris].handler = &handle_file;
 	uris[numuris].user_ctx = NULL;
-	
+
 	rv = httpd_register_uri_handler(server, &uris[numuris++]);
 	if (rv == ESP_OK)
 		ESP_LOGI(TAG, "registered special handler /");
@@ -277,7 +277,7 @@ fail:
 					free((char *)uris[i].uri);
 
 			numuris = 0;
-		}	
+		}
 	}
 
 	return rv;
