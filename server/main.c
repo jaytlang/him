@@ -95,6 +95,9 @@ him_recv(int fd, short event, void *arg)
 				if (!sending && event_add(&h->ev, NULL) < 0)
 					err(1, "him_recv: event_add");
 				return;
+			} else if (errno == ECONNRESET) {
+				him_teardown(h);
+				return;
 			} else err(1, "him_recv: read");
 		}
 
