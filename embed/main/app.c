@@ -28,3 +28,91 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#include <sys/socket.h>
+
+#include <arpa/inet.h>
+#include <netinet/in.h>
+
+#include <stdint.h>
+#include <errno.h>
+#include <netdb.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#include "him.h"
+
+LOG_SET_TAG("app");
+
+static int	sockfd = -1;
+
+esp_err_t
+app_init(void)
+{
+	struct hostent		*host;
+	struct sockaddr_in	 sa;
+
+	sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (sockfd < 0) CATCH_RETURN(errno);
+
+	if ((host = gethostbyname(APP_NAME)) == NULL) {
+		/* may not provide a good report, not sure */
+		close(sockfd);
+		CATCH_RETURN(h_errno);
+	}
+
+	ESP_LOGI(TAG, "connecting to %s", inet_ntoa(*(in_addr_t *)host->h_addr));
+
+	sa.sin_family = AF_INET;
+	sa.sin_port = htons(APP_PORT);
+	sa.sin_addr.s_addr = *(in_addr_t *)host->h_addr;
+
+	if (connect(sockfd, (struct sockaddr *)&sa,
+	    sizeof(struct sockaddr_in)) < 0) {
+		close(sockfd);
+		CATCH_RETURN(errno);
+	}
+
+	return 0;
+}
+
+void
+app_readloop(void)
+{
+	for (;;) {
+		ssize_t	bytesread;
+		uint8_t	newcolor;
+
+		bytesread = read(sockfd, &newcolor, sizeof(uint8_t));
+		if (bytesread < 0) CATCH_DIE(errno);
+		else if (bytesread == 0) {
+			/* try a quick reboot, might be okay
+			 * on reboot, if we can't connect, _then_ die
+			 */
+			ESP_LOGI(TAG, "server closed connection");
+			reboot(NULL);
+		}
+
+		led_spin(newcolor);
+	}
+}
+
+esp_err_t
+app_changecolor(void)
+{
+	uint8_t	newcolor;
+	ssize_t	byteswritten;
+
+	newcolor = (led_currentcolor() + 1 % (LED_COLOR_MAX - 1)) + 1;
+	byteswritten = write(sockfd, &newcolor, sizeof(uint8_t));
+
+	if (byteswritten < 0) CATCH_DIE(errno);
+	else if (byteswritten == 0) {
+		/* try a quick reboot, might be okay
+		 * on reboot, if we can't connect, _then_ die
+		 */
+		ESP_LOGI(TAG, "server closed connection");
+		reboot(NULL);
+	}
+
+	return 0;
+}

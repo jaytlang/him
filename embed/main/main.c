@@ -33,6 +33,9 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#include <FreeRTOS/FreeRTOS.h>
+#include <FreeRTOS/task.h>
+
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_system.h"
@@ -43,6 +46,7 @@ LOG_SET_TAG("main");
 
 static void	 wifi_state_changed(int);
 static char	*ssid, *pass;
+static int	 dying = 0;
 
 static void
 wifi_state_changed(int connected)
@@ -54,23 +58,29 @@ wifi_state_changed(int connected)
 	}
 
 	ESP_LOGI(TAG, "wifi up, starting late boot activities");
-	led_spin(LED_COLOR_PURPLE);
+	CATCH_DIE(app_init());
+	CATCH_DIE(button_init(1));
+
+	/* never returns */
+	app_readloop();
 }
 
 void
 die(void)
 {
 	ESP_LOGW(TAG, "unrecoverable error detected; resetting");
+	dying = 1;
 
 	/* have to call this so that further button presses don't
 	 * trigger interrupts and mess us up any more
 	 */
-	if (ssid == NULL) httpd_teardown();
 	button_teardown();
 
 	led_blink(LED_COLOR_RED);
 	fs_clear_credentials();
 	sched_schedule(6 * SCHED_US_PER_S, reboot, NULL);
+
+	for (;;) taskYIELD();
 }
 
 int
@@ -78,10 +88,13 @@ reboot(void *arg)
 {
 	ESP_LOGW(TAG, "preparing for reboot");
 
-	if (ssid == NULL) httpd_teardown();
-	led_teardown();
-	rmt_teardown();
-	button_teardown();
+	if (!dying) {
+		if (ssid == NULL) httpd_teardown();
+		led_teardown();
+		rmt_teardown();
+		button_teardown();
+	}
+
 	esp_restart();
 
 	/* never reached */
@@ -106,7 +119,6 @@ app_main(void)
 	/* late boot */
 	CATCH_GOTO(fs_init(), error);
 	CATCH_GOTO(fs_read_credentials(&ssid, &pass), error);
-	CATCH_GOTO(button_init(), error);
 
 	if (ssid == NULL) {
 		ESP_LOGI(TAG, "no credentials found, bootstrapping");
@@ -115,6 +127,7 @@ app_main(void)
 		CATCH_GOTO(wifi_initap(), error);
 		CATCH_GOTO(mdns_advertise(), error);
 		CATCH_GOTO(httpd_init(), error);
+		CATCH_GOTO(button_init(0), error);
 
 	} else {
 		ESP_LOGI(TAG, "got credentials, connecting (cb = %p)", &wifi_state_changed);

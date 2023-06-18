@@ -163,6 +163,7 @@ esp_err_t		rmt_enqueue(void *, size_t);
 				 LED_COLOR_BLUE)
 
 esp_err_t		led_init(void);
+uint8_t			led_currentcolor(void);
 void			led_teardown(void);
 
 /* could definitely have some sort of cool callback-based
@@ -183,7 +184,15 @@ esp_err_t		led_spin(uint8_t);
 
 ESP_EVENT_DECLARE_BASE(BUTTON_EVENT);
 
-esp_err_t		button_init(void);
+esp_err_t		button_init(int);
 void			button_teardown(void);
+
+/* app.c */
+#define APP_NAME	"juliana.jtlang.dev"
+#define APP_PORT	6969
+
+esp_err_t		app_init(void);
+void			app_readloop(void);
+esp_err_t		app_changecolor(void);
 
 #endif /* HIM_H */

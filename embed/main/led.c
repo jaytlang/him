@@ -68,6 +68,7 @@ static int		 primaryidx, secondaryidx;
 static int		 state = STATE_SOLID;
 static struct pixel	*actives = NULL;
 static struct pixel	 reference = { 0 };
+static uint8_t		 refcolor = 0;
 
 static esp_err_t	 epoch_new(uint64_t **);
 
@@ -103,7 +104,16 @@ led_init(void)
 		CATCH_RETURN(rv);
 	}
 
+	refcolor = 0;
+	memset(&reference, 0, sizeof(struct pixel));
+
 	return 0;
+}
+
+uint8_t
+led_currentcolor(void)
+{
+	return refcolor;
 }
 
 void
@@ -164,6 +174,7 @@ led_solid(uint8_t color)
 
 	state = STATE_SOLID;
 	reference = p;
+	refcolor = color;
 
 	return 0;
 }
@@ -230,6 +241,7 @@ led_blink(uint8_t color)
 	ESP_LOGI(TAG, "starting blink during epoch %llu", *newepoch);
 	state = STATE_BLINK_UP;
 	reference = p;
+	refcolor = color;
 	return 0;
 }
 
@@ -318,6 +330,7 @@ led_spin(uint8_t color)
 	CATCH_RETURN(sched_schedule(SCHED_US_PER_S / ANIMATION_FPS, spin_cb, newepoch));
 
 	reference = p;
+	refcolor = color;
 	state = STATE_SPIN_UP;
 	transitionpt = 0;
 

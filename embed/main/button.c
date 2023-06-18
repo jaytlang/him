@@ -51,6 +51,7 @@ static gpio_glitch_filter_handle_t	filter;
 static uint64_t				pressnumber = 0;
 
 static int	buttonup = 0;
+static int	enableshort = 0;
 
 static IRAM_ATTR void	button_isr(void *);
 static void		button_event_handler(void *, esp_event_base_t, int32_t, void *);
@@ -87,7 +88,7 @@ button_event_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
 			sched_schedule(BUTTON_RESET_DELAY_US, reboot_checker, presses);
 
 		/* TODO - this is temporary */
-		} else led_spin((++pressnumber % (LED_COLOR_MAX - 1)) + 1);
+		} else if (enableshort) app_changecolor();
 
 		/* re-enable the button interrupt */
 		CATCH_DIE(gpio_intr_enable(BUTTON_GPIO_NUM));
@@ -104,7 +105,7 @@ button_isr(void *arg)
 }
 
 esp_err_t
-button_init(void)
+button_init(int es)
 {
 	gpio_pin_glitch_filter_config_t	glitchcfg = { 0 };
 
@@ -128,6 +129,7 @@ button_init(void)
 	    NULL), stopintr);
 
 	buttonup = 1;
+	enableshort = es;
 	return 0;
 
 stopintr:
@@ -153,4 +155,5 @@ button_teardown(void)
 	}
 
 	buttonup = 0;
+	enableshort = 0;
 }

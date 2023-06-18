@@ -1,4 +1,5 @@
-idf_component_register(SRCS	"button.c"
+idf_component_register(SRCS	"app.c"
+				"button.c"
 				"fs.c"
 				"httpd.c"
 				"main.c"
