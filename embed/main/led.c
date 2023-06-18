@@ -170,6 +170,7 @@ led_solid(uint8_t color)
 	else p = color_to_pixel(color);
 
 	for (i = 0; i < RMT_NUM_LEDS; i++) actives[i] = p;
+	actives[15].r = actives[15].g = actives[15].b = 0;
 	CATCH_RETURN(rmt_enqueue(actives, ACTIVE_SIZE));
 
 	state = STATE_SOLID;
@@ -217,6 +218,7 @@ blink_cb(void *arg)
 	    (actives->b == 0 && reference.b != 0))
 		state = STATE_BLINK_UP;
 
+	actives[15].r = actives[15].g = actives[15].b = 0;
 	rmt_enqueue(actives, ACTIVE_SIZE);
 	return SCHED_CONTINUE;
 }
@@ -293,6 +295,7 @@ static int
 spin_cb(void *arg)
 {
 	uint64_t	*myepoch = (uint64_t *)arg;
+	struct pixel	 hack;
 
 	if (*myepoch != epoch) {
 		ESP_LOGI(TAG, "stopping spin during epoch %llu", *myepoch);
@@ -303,7 +306,12 @@ spin_cb(void *arg)
 	if (state == STATE_SPIN) update_spin();
 	else prep_spin();
 
+
+	hack = actives[15];
+	actives[15].r = actives[15].g = actives[15].b = 0;
 	rmt_enqueue(actives, ACTIVE_SIZE);
+	actives[15] = hack;
+
 	return SCHED_CONTINUE;
 }
 

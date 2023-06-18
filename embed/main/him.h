@@ -68,10 +68,9 @@
 
 /* logging setting - set this to ESP_LOG_VERBOSE
  * to enable debugging outputs. when this lands in
- * juliana's hands, set to 0 since no uart will be
- * hooked in
+ * juliana's hands, set to ESP_LOG_WARN.
  */
-#define LOG_LEVEL	ESP_LOG_VERBOSE
+#define LOG_LEVEL	ESP_LOG_WARN
 #define LOG_SET_TAG(X)	static const char *TAG = X
 
 
@@ -192,7 +191,7 @@ void			button_teardown(void);
 #define APP_PORT	6969
 
 esp_err_t		app_init(void);
-void			app_readloop(void);
+void			app_readloop(void *);
 esp_err_t		app_changecolor(void);
 
 #endif /* HIM_H */

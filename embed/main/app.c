@@ -76,7 +76,7 @@ app_init(void)
 }
 
 void
-app_readloop(void)
+app_readloop(void *arg)
 {
 	for (;;) {
 		ssize_t	bytesread;
@@ -92,8 +92,11 @@ app_readloop(void)
 			reboot(NULL);
 		}
 
+		ESP_LOGI(TAG, "changing color to %d", newcolor);
 		led_spin(newcolor);
 	}
+
+	(void)arg;
 }
 
 esp_err_t
@@ -102,7 +105,10 @@ app_changecolor(void)
 	uint8_t	newcolor;
 	ssize_t	byteswritten;
 
-	newcolor = (led_currentcolor() + 1 % (LED_COLOR_MAX - 1)) + 1;
+	newcolor = led_currentcolor() + 1;
+	if (newcolor >= LED_COLOR_MAX) newcolor = 1;
+
+	ESP_LOGI(TAG, "telling the server about candidate new color %d", newcolor);
 	byteswritten = write(sockfd, &newcolor, sizeof(uint8_t));
 
 	if (byteswritten < 0) CATCH_DIE(errno);

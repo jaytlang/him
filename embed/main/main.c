@@ -51,6 +51,7 @@ static int	 dying = 0;
 static void
 wifi_state_changed(int connected)
 {
+	TaskHandle_t	h = NULL;
 	if (!connected) {
 		ESP_LOGW(TAG, "lost wifi connectivity");
 		fs_clear_credentials();
@@ -62,7 +63,7 @@ wifi_state_changed(int connected)
 	CATCH_DIE(button_init(1));
 
 	/* never returns */
-	app_readloop();
+	xTaskCreate(app_readloop, "read loop", 4096, NULL, tskIDLE_PRIORITY, &h);
 }
 
 void
@@ -80,7 +81,7 @@ die(void)
 	fs_clear_credentials();
 	sched_schedule(6 * SCHED_US_PER_S, reboot, NULL);
 
-	for (;;) taskYIELD();
+	for (;;) usleep(1);
 }
 
 int

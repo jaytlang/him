@@ -79,6 +79,7 @@ button_event_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
 
 	if (base == BUTTON_EVENT && id == BUTTON_EVENT_CHANGED) {
 		direction = !gpio_get_level(BUTTON_GPIO_NUM);
+		pressnumber++;
 
 		if (direction) {
 			presses = malloc(sizeof(uint64_t));
@@ -92,6 +93,7 @@ button_event_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
 
 		/* re-enable the button interrupt */
 		CATCH_DIE(gpio_intr_enable(BUTTON_GPIO_NUM));
+		ESP_LOGI(TAG, "button %s", (direction) ? "down" : "up");
 	}
 }
 
