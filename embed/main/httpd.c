@@ -288,17 +288,18 @@ httpd_teardown(void)
 {
 	size_t	i;
 
-	ESP_LOGI(TAG, "stopping http server");
-	httpd_stop(server);
-	server = NULL;
+	if (server != NULL) {
+		ESP_LOGI(TAG, "stopping http server");
+		httpd_stop(server);
+		server = NULL;
 
-	for (i = 0; i < numuris; i++) {
-		ESP_LOGI(TAG, "unregistering uri %p", uris[i].uri);
-		if (strcmp(uris[i].uri, HTTPD_CONFIRM) != 0 &&
-		    strlen(uris[i].uri) != 1)
-			free((char *)(uris[i].uri));
+		for (i = 0; i < numuris; i++) {
+			ESP_LOGI(TAG, "unregistering uri %p", uris[i].uri);
+			if (strcmp(uris[i].uri, HTTPD_CONFIRM) != 0 &&
+			    strlen(uris[i].uri) != 1)
+				free((char *)(uris[i].uri));
+		}
+
+		numuris = 0;
 	}
-
-	numuris = 0;
-
 }

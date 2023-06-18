@@ -176,7 +176,7 @@ esp_err_t		led_blink(uint8_t);
 esp_err_t		led_spin(uint8_t);
 
 /* button.c */
-#define BUTTON_GPIO_NUM		5
+#define BUTTON_GPIO_NUM		6
 #define BUTTON_EVENT_CHANGED	1
 
 #define BUTTON_RESET_DELAY_US	(3 * SCHED_US_PER_S)

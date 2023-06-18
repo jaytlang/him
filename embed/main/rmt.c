@@ -150,9 +150,10 @@ rmt_del(rmt_encoder_t *enc)
 esp_err_t
 rmt_init(void)
 {
-	rmt_tx_channel_config_t cfg = { 0 };
-	rmt_copy_encoder_config_t blankcfg;
-	rmt_bytes_encoder_config_t datacfg;
+	esp_err_t			rv;
+	rmt_tx_channel_config_t		cfg = { 0 };
+	rmt_copy_encoder_config_t	blankcfg;
+	rmt_bytes_encoder_config_t	datacfg;
 
 	/* set up tx channel */
 	cfg.gpio_num = RMT_GPIO_NUM;
@@ -162,12 +163,13 @@ rmt_init(void)
 	cfg.trans_queue_depth = TXQ_BACKLOG_SIZE;
 	cfg.flags.with_dma = 1;
 
-	CATCH_RETURN(rmt_new_tx_channel(&cfg, &chan));
-	CATCH_RETURN(rmt_enable(chan));
+	if ((rv = rmt_new_tx_channel(&cfg, &chan)) < 0) CATCH_RETURN(rv);
+	else if ((rv = rmt_enable(chan)) < 0) CATCH_GOTO(rv, delchan);
 
 	/* reset signal */
-	CATCH_RETURN(rmt_new_copy_encoder(&blankcfg,
-	    (rmt_encoder_handle_t *)&blankobj));
+	if ((rv = rmt_new_copy_encoder(&blankcfg,
+	    (rmt_encoder_handle_t *)&blankobj)) < 0)
+	    	CATCH_GOTO(rv, delchan);
 
 	blankdata.level0 = 0;
 	blankdata.duration0 = NS_TO_TICKS(RESET_NS) / 2;
@@ -184,15 +186,25 @@ rmt_init(void)
 	datacfg.bit1.duration1 = NS_TO_TICKS(ONE_LEVEL_SECOND_NS);
 	datacfg.flags.msb_first = 1;
 
-	CATCH_RETURN(rmt_new_bytes_encoder(&datacfg,
-	    (rmt_encoder_handle_t *)&dataobj));
+	if ((rv = rmt_new_bytes_encoder(&datacfg,
+	    (rmt_encoder_handle_t *)&dataobj)) < 0)
+	    	CATCH_GOTO(rv, delcopy);
 
 	/* plumbing */
 	base.encode = &rmt_encode;
 	base.reset = &rmt_reset;
 	base.del = &rmt_del;
 
-	return 0;
+delcopy:
+	if (rv < 0) rmt_del_encoder(blankobj);
+delchan:
+	if (rv < 0) {
+		rmt_disable(chan);
+		rmt_del_channel(chan);
+		chan = NULL;
+	}
+
+	return rv;
 }
 
 esp_err_t
@@ -207,9 +219,11 @@ rmt_enqueue(void *data, size_t datasize)
 void
 rmt_teardown(void)
 {
-	rmt_del_encoder(&base);
+	if (chan != NULL) {
+		rmt_del_encoder(&base);
+		rmt_disable(chan);
+		rmt_del_channel(chan);
+	}
 
-	rmt_disable(chan);
-	rmt_del_channel(chan);
 	chan = NULL;
 }

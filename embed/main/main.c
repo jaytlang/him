@@ -60,18 +60,17 @@ wifi_state_changed(int connected)
 void
 die(void)
 {
-	ESP_LOGW(TAG, "unrecoverable error detected; rebooting");
+	ESP_LOGW(TAG, "unrecoverable error detected; resetting");
 
 	/* have to call this so that further button presses don't
 	 * trigger interrupts and mess us up any more
 	 */
+	if (ssid == NULL) httpd_teardown();
 	button_teardown();
 
 	led_blink(LED_COLOR_RED);
-	sleep(6);
-
 	fs_clear_credentials();
-	esp_restart();
+	sched_schedule(6 * SCHED_US_PER_S, reboot, NULL);
 }
 
 int
@@ -82,8 +81,8 @@ reboot(void *arg)
 	if (ssid == NULL) httpd_teardown();
 	led_teardown();
 	rmt_teardown();
-	esp_restart();
 	button_teardown();
+	esp_restart();
 
 	/* never reached */
 	return SCHED_STOP;
@@ -99,16 +98,15 @@ app_main(void)
 	esp_event_loop_create_default();
 
 	/* early boot */
-	CATCH_GOTO(button_init(), error);
 	CATCH_GOTO(rmt_init(), error);
 	CATCH_GOTO(led_init(), error);
 
 	CATCH_GOTO(led_blink(LED_COLOR_PURPLE), error);
 
 	/* late boot */
-
 	CATCH_GOTO(fs_init(), error);
 	CATCH_GOTO(fs_read_credentials(&ssid, &pass), error);
+	CATCH_GOTO(button_init(), error);
 
 	if (ssid == NULL) {
 		ESP_LOGI(TAG, "no credentials found, bootstrapping");

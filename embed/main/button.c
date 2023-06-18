@@ -50,16 +50,11 @@ static gpio_isr_handle_t		isr;
 static gpio_glitch_filter_handle_t	filter;
 static uint64_t				pressnumber = 0;
 
-/* die _has_ to call teardown so that spamming
- * the button doesn't blow up user resets
- * use this to prevent issues if super early boot
- * goes wrong
- */
-static int	buttonsup = 0;
+static int	buttonup = 0;
 
-static void	button_isr(void *);
-static void	button_event_handler(void *, esp_event_base_t, int32_t, void *);
-static int	reboot_checker(void *);
+static IRAM_ATTR void	button_isr(void *);
+static void		button_event_handler(void *, esp_event_base_t, int32_t, void *);
+static int		reboot_checker(void *);
 
 static int
 reboot_checker(void *arg)
@@ -82,7 +77,7 @@ button_event_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
 	int		 direction;
 
 	if (base == BUTTON_EVENT && id == BUTTON_EVENT_CHANGED) {
-		direction = *(int *)arg;
+		direction = !gpio_get_level(BUTTON_GPIO_NUM);
 
 		if (direction) {
 			presses = malloc(sizeof(uint64_t));
@@ -93,17 +88,18 @@ button_event_handler(void *arg, esp_event_base_t base, int32_t id, void *data)
 
 		/* TODO - this is temporary */
 		} else led_spin((++pressnumber % (LED_COLOR_MAX - 1)) + 1);
+
+		/* re-enable the button interrupt */
+		CATCH_DIE(gpio_intr_enable(BUTTON_GPIO_NUM));
 	}
 }
 
 static void
 button_isr(void *arg)
 {
-	int level;
-
-	/* best effort */
-	level = !gpio_get_level(BUTTON_GPIO_NUM);
-	esp_event_post(BUTTON_EVENT, BUTTON_EVENT_CHANGED, &level, sizeof(int), 0);
+	esp_event_isr_post(BUTTON_EVENT, BUTTON_EVENT_CHANGED, NULL, 0, NULL);
+	/* briefly disable the button interrupt */
+	CATCH_DIE(gpio_intr_disable(BUTTON_GPIO_NUM));
 	(void)arg;
 }
 
@@ -131,7 +127,7 @@ button_init(void)
 	    &button_event_handler,
 	    NULL), stopintr);
 
-	buttonsup = 1;
+	buttonup = 1;
 	return 0;
 
 stopintr:
@@ -149,11 +145,12 @@ freefilter:
 void
 button_teardown(void)
 {
-	if (buttonsup) {
+	if (buttonup) {
 		gpio_intr_disable(BUTTON_GPIO_NUM);
 		esp_intr_free(isr);
 		gpio_glitch_filter_disable(filter);
 		gpio_del_glitch_filter(filter);
-		buttonsup = 0;
 	}
+
+	buttonup = 0;
 }

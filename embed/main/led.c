@@ -92,12 +92,15 @@ epoch_new(uint64_t **e)
 esp_err_t
 led_init(void)
 {
+	esp_err_t	rv;
+
 	actives = calloc(RMT_NUM_LEDS, sizeof(struct pixel));
 	if (actives == NULL) CATCH_RETURN(errno);
 
-	if (led_solid(0) != 0) {
+	if ((rv = led_solid(0)) < 0) {
 		free(actives);
-		CATCH_RETURN(errno);
+		actives = NULL;
+		CATCH_RETURN(rv);
 	}
 
 	return 0;
@@ -106,8 +109,10 @@ led_init(void)
 void
 led_teardown(void)
 {
-	free(actives);
-	actives = NULL;
+	if (actives != NULL) {
+		free(actives);
+		actives = NULL;
+	}
 }
 
 static struct pixel
@@ -173,6 +178,7 @@ blink_cb(void *arg)
 	uint64_t	*myepoch = (uint64_t *)arg;
 
 	if (*myepoch != epoch) {
+		ESP_LOGI(TAG, "stopping blink epoch %llu", *myepoch);
 		free(myepoch);
 		return SCHED_STOP;
 	}
@@ -221,6 +227,7 @@ led_blink(uint8_t color)
 	CATCH_RETURN(sched_schedule(SCHED_US_PER_S / ANIMATION_FPS,
 	    blink_cb, newepoch));
 
+	ESP_LOGI(TAG, "starting blink during epoch %llu", *newepoch);
 	state = STATE_BLINK_UP;
 	reference = p;
 	return 0;
@@ -276,6 +283,7 @@ spin_cb(void *arg)
 	uint64_t	*myepoch = (uint64_t *)arg;
 
 	if (*myepoch != epoch) {
+		ESP_LOGI(TAG, "stopping spin during epoch %llu", *myepoch);
 		free(myepoch);
 		return SCHED_STOP;
 	}
@@ -313,6 +321,7 @@ led_spin(uint8_t color)
 	state = STATE_SPIN_UP;
 	transitionpt = 0;
 
+	ESP_LOGI(TAG, "starting spin during epoch %llu", *newepoch);
  end:
 	return 0;
 }
