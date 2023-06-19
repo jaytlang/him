@@ -87,9 +87,10 @@ him_recv(int fd, short event, void *arg)
 {
 	struct him	*h = (struct him *)arg;
 	ssize_t		 bytesread;
+	char		 newcolor;
 
 	for (;;) {
-		bytesread = read(fd, &color, sizeof(char));
+		bytesread = read(fd, &newcolor, sizeof(char));
 		if (bytesread == -1) {
 			if (errno == EWOULDBLOCK) {
 				if (!sending && event_add(&h->ev, NULL) < 0)
@@ -106,6 +107,13 @@ him_recv(int fd, short event, void *arg)
 			return;
 		}
 
+		if (newcolor >= LED_COLOR_MAX) {
+			warnx("illegal color %d received", newcolor);
+			him_teardown(h);
+			return;
+		}
+
+		color = newcolor;
 		warnx("received new color %d from fd %d", color, fd);
 		him_change_state(HIM_STATE_SEND);
 	}

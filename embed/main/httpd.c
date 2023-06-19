@@ -197,7 +197,7 @@ handle_cred_update(httpd_req_t *req)
 	free(buf);
 
 	ESP_LOGI(TAG, "credential update complete, scheduling reboot in 10s");
-	sched_schedule(10 * SCHED_US_PER_S, reboot, NULL);
+	sched_schedule(5 * SCHED_US_PER_S, reboot, NULL);
 	return handle_file(req);
 }
 

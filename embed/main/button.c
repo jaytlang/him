@@ -102,7 +102,7 @@ button_isr(void *arg)
 {
 	esp_event_isr_post(BUTTON_EVENT, BUTTON_EVENT_CHANGED, NULL, 0, NULL);
 	/* briefly disable the button interrupt */
-	CATCH_DIE(gpio_intr_disable(BUTTON_GPIO_NUM));
+	gpio_intr_disable(BUTTON_GPIO_NUM);
 	(void)arg;
 }
 

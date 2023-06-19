@@ -24,5 +24,6 @@ to build the software in embed / reprogram the ESP:
 - back out to the main menu, then head to Component config > Driver
   Configurations > RMT Configuration. enable the "ISR IRAM safe" option.
 - back out and save the configuration
+- optionally tune the compiler options for performance. then re-save.
 - run `idf.py build`
 - run `idf.py flash monitor` with the board plugged in

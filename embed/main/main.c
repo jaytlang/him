@@ -72,16 +72,8 @@ die(void)
 	ESP_LOGW(TAG, "unrecoverable error detected; resetting");
 	dying = 1;
 
-	/* have to call this so that further button presses don't
-	 * trigger interrupts and mess us up any more
-	 */
-	button_teardown();
-
-	led_blink(LED_COLOR_RED);
 	fs_clear_credentials();
-	sched_schedule(6 * SCHED_US_PER_S, reboot, NULL);
-
-	for (;;) usleep(1);
+	reboot(NULL);
 }
 
 int
@@ -115,7 +107,7 @@ app_main(void)
 	CATCH_GOTO(rmt_init(), error);
 	CATCH_GOTO(led_init(), error);
 
-	CATCH_GOTO(led_blink(LED_COLOR_PURPLE), error);
+	CATCH_GOTO(led_blink(LED_COLOR_RED), error);
 
 	/* late boot */
 	CATCH_GOTO(fs_init(), error);
