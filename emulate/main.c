@@ -1,6 +1,13 @@
 #include <sys/types.h>
 
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+
+#include <err.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <netdb.h>
 #include <limits.h>
 #include <math.h>
 #include <stdio.h>
@@ -154,6 +161,8 @@ led_spin(uint8_t color)
 
 /* END LED THINGS */
 
+#define APP_NAME	"juliana.jtlang.dev"
+
 #define SDL_ERROR(S)	printf("%s: %s", S, SDL_GetError())
 
 #define SCREEN_WIDTH	640
@@ -181,9 +190,17 @@ static SDL_Window	*window = NULL;
 static SDL_Renderer	*renderer = NULL;
 static SDL_Texture	*texture = NULL;
 
-static void	index_to_position(int, uint32_t, uint32_t *, uint32_t *);
-static void	draw_circle(SDL_Renderer *, uint32_t, uint32_t,
-		    uint32_t, struct pixel);
+/* what color the LEDs are spinning right now */
+static uint8_t		 currentcolor = LED_COLOR_GREEN;
+
+static int		 sockfd;
+
+static void		 index_to_position(int, uint32_t, uint32_t *, uint32_t *);
+static void		 draw_circle(SDL_Renderer *, uint32_t, uint32_t,
+		    	     uint32_t, struct pixel);
+
+static uint8_t		 poll_color(void);
+static int		 try_increment_color(uint8_t);
 
 static void
 index_to_position(int index, uint32_t radius, uint32_t *x, uint32_t *y)
@@ -230,11 +247,62 @@ draw_circle(SDL_Renderer *r, uint32_t x, uint32_t y,
 	}
 }
 
+static uint8_t
+poll_color(void)
+{
+	uint8_t	new;
+
+	if (read(sockfd, &new, sizeof(uint8_t)) < 0) {
+		if (errno == EAGAIN) return currentcolor;
+		err(1, "read");
+	}
+
+	return new;
+}
+
+static int
+try_increment_color(uint8_t nextcolor)
+{
+	if (write(sockfd, &nextcolor, sizeof(uint8_t)) > 0) return 1;
+	if (errno != EAGAIN) err(1, "write");
+	else return 0;
+}
+
 int
 main(int argc, char *argv[])
 {
-	struct pixel	black = { 0 };
-	struct pixel	ring = { .r = 70, .g = 70, .b = 70 };
+	struct hostent		*host;
+	struct sockaddr_in	 sa;
+	int			 flags;
+
+	struct pixel		 black = { 0 };
+	struct pixel		 ring = { .r = 70, .g = 70, .b = 70 };
+
+	sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (sockfd < 0) err(1, "socket");
+
+	if ((host = gethostbyname(APP_NAME)) == NULL) {
+		close(sockfd);
+		errx(1, "gethostbyname (h_errno = %d)", h_errno);
+	}
+
+	sa.sin_family = AF_INET;
+	sa.sin_port = htons(6969);
+	sa.sin_addr.s_addr = *(in_addr_t *)host->h_addr;
+
+	if (connect(sockfd, (struct sockaddr *)&sa,
+	    sizeof(struct sockaddr_in)) < 0) {
+	    	close(sockfd);
+		err(1, "connect");
+	}
+
+	if ((flags = fcntl(sockfd, F_GETFL)) < 0) err(1, "fcntl F_GETFL");
+	flags |= O_NONBLOCK;
+	if (fcntl(sockfd, F_SETFL, flags) < 0) err(1, "fcntl F_SETFL");
+
+	if ((flags = fcntl(sockfd, F_GETFD)) < 0) err(1, "fcntl F_GETFD");
+	flags |= O_CLOEXEC;
+	if (fcntl(sockfd, F_SETFD, flags) < 0) err(1, "fcntl F_SETFD");
 
 	if (SDL_InitSubSystem(SDL_INIT_VIDEO) < 0) {
 		SDL_ERROR("SDL_InitSubsystem");
@@ -267,21 +335,41 @@ main(int argc, char *argv[])
 		goto end;
 	}
 
-	/* initialize the LEDs here */
 	SDL_memset(actives, 0, ACTIVE_SIZE);
-	led_spin(LED_COLOR_YELLOW);
+	currentcolor = poll_color();
+	led_spin(currentcolor);
 
 	for (;;) {
 		SDL_Event	event;
-		int		i;
-
-		/* make user updates to the LEDs */
-		if (spinready) update_spin();
-		else prep_spin();
+		int		i, pending = 0;
+		uint8_t		nextcolor;
 
 		/* check if we got interrupted */
-		while (SDL_PollEvent(&event))
+		while (SDL_PollEvent(&event)) {
 			if (event.type == SDL_QUIT) goto end;
+			else if (event.type == SDL_KEYDOWN) {
+				if (event.key.keysym.sym == SDLK_SPACE)
+					pending = 1;
+			}
+		}
+
+		if (pending) {
+			if (currentcolor == 6) nextcolor = 1;
+			else nextcolor = currentcolor + 1;
+
+			pending = !try_increment_color(nextcolor);
+		}
+
+		/* do we need to update the LED color? */
+		nextcolor = poll_color();
+		if (nextcolor != currentcolor) {
+			currentcolor = nextcolor;
+			led_spin(currentcolor);
+		}
+
+		/* make per-frame updates to the LEDs */
+		if (spinready) update_spin();
+		else prep_spin();
 
 		/* render the LEDs */
 		SDL_SetRenderTarget(renderer, texture);
@@ -302,8 +390,6 @@ main(int argc, char *argv[])
 		SDL_RenderPresent(renderer);
 
 		SDL_Delay(FRAME_DELAY);
-
-		if (++framecnt == 1000) led_spin(LED_COLOR_TURQUOISE);
 	}
 
 end:
