@@ -10,7 +10,8 @@ fi
 
 # kill off the firewall, we have
 # infrastructure-level restrictions
-# in oracle cloud
+# in oracle cloud. the c executable
+# does this as well, but never hurts
 iptables -P INPUT ACCEPT
 iptables -P OUTPUT ACCEPT
 iptables -P FORWARD ACCEPT
