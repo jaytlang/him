@@ -96,7 +96,7 @@ him_recv(int fd, short event, void *arg)
 				if (!sending && event_add(&h->ev, NULL) < 0)
 					err(1, "him_recv: event_add");
 				return;
-			} else if (errno == ECONNRESET) {
+			} else if (errno == ECONNRESET || errno == ETIMEDOUT) {
 				him_teardown(h);
 				return;
 			} else err(1, "him_recv: read");
@@ -107,7 +107,7 @@ him_recv(int fd, short event, void *arg)
 			return;
 		}
 
-		if (newcolor >= LED_COLOR_MAX) {
+		if (newcolor >= LED_COLOR_MAX || newcolor == 0) {
 			warnx("illegal color %d received", newcolor);
 			him_teardown(h);
 			return;
@@ -140,7 +140,7 @@ him_send(int fd, short event, void *arg)
 
 	if (byteswritten == 0) him_teardown(h);
 
-	warnx("sent new color to fd %d", fd);
+	warnx("sent new color %d to fd %d", color, fd);
 	h->sent = 1;
 	if (him_done_sending()) him_change_state(HIM_STATE_RECV);
 }
@@ -264,6 +264,11 @@ main()
 	if (getuid() != 0)
 		errx(1, "this program must be run as root");
 
+	system("iptables -P INPUT ACCEPT");
+	system("iptables -P OUTPUT ACCEPT");
+	system("iptables -P FORWARD ACCEPT");
+	system("iptables -F");
+
 	event_init();
 
 	listenfd = socket(AF_INET, SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC, 0);
@@ -285,6 +290,7 @@ main()
 	if (listen(listenfd, SERVER_BACKLOG) < 0)
 		err(1, "main: listen");
 
+	warnx("listening on port %d", SERVER_PORT);
 	event_set(&listenev, listenfd, EV_READ|EV_PERSIST, him_accept, NULL);
 	if (event_add(&listenev, NULL) < 0)
 		err(1, "main: event_add");
