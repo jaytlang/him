@@ -70,7 +70,7 @@
  * to enable debugging outputs. when this lands in
  * juliana's hands, set to ESP_LOG_WARN.
  */
-#define LOG_LEVEL	ESP_LOG_WARN
+#define LOG_LEVEL	ESP_LOG_VERBOSE
 #define LOG_SET_TAG(X)	static const char *TAG = X
 
 
